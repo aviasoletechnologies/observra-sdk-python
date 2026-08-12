@@ -12,7 +12,7 @@ import json
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from observra.config import get_config
 from observra.tracing.context import activate_framework_llm_span, deactivate_framework_llm_span
@@ -44,7 +44,7 @@ class _SpanScope:
     framework_llm_token: Any = None
 
 
-def _parse_version(raw: str) -> Tuple[int, ...]:
+def _parse_version(raw: str) -> tuple[int, ...]:
     parts = []
     for chunk in raw.split(".")[:3]:
         digits = "".join(character for character in chunk if character.isdigit())
@@ -54,10 +54,10 @@ def _parse_version(raw: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def _tracer_or_none() -> Optional[ObservraTracer]:
+def _tracer_or_none() -> ObservraTracer | None:
     try:
         return get_tracer(get_config())
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning(
             "observra: Semantic Kernel instrumentation active but observra.configure() "
             "was never called; skipping trace for this operation",
@@ -73,7 +73,7 @@ def _safe_str(value: Any) -> str:
         return str(value)[:_MAX_ATTR_TEXT_LEN]
 
 
-def _start_scope(name: str, kind: str, attributes: Dict[str, Any]) -> Optional[_SpanScope]:
+def _start_scope(name: str, kind: str, attributes: dict[str, Any]) -> _SpanScope | None:
     tracer = _tracer_or_none()
     if tracer is None:
         return None
@@ -91,15 +91,15 @@ def _start_scope(name: str, kind: str, attributes: Dict[str, Any]) -> Optional[_
         context_token = otel_context.attach(trace_api.set_span_in_context(span))
         framework_llm_token = activate_framework_llm_span(span) if kind == SpanKind.LLM else None
         return _SpanScope(span, context_token, framework_llm_token)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: failed to start Semantic Kernel span", exc_info=True)
         return None
 
 
 def _end_scope(
-    scope: Optional[_SpanScope],
-    attributes: Optional[Dict[str, Any]] = None,
-    error: Optional[BaseException] = None,
+    scope: _SpanScope | None,
+    attributes: dict[str, Any] | None = None,
+    error: BaseException | None = None,
 ) -> None:
     if scope is None:
         return
@@ -112,11 +112,11 @@ def _end_scope(
         if scope.framework_llm_token is not None:
             deactivate_framework_llm_span(scope.framework_llm_token)
         otel_context.detach(scope.context_token)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: failed to end Semantic Kernel span", exc_info=True)
 
 
-def _function_attributes(context: Any) -> Dict[str, Any]:
+def _function_attributes(context: Any) -> dict[str, Any]:
     function = context.function
     name = getattr(function, "fully_qualified_name", getattr(function, "name", "function"))
     return {
@@ -149,7 +149,7 @@ def _chat_history_text(history: Any) -> str:
     return _safe_str(messages)
 
 
-def _service_attributes(service: Any, input_value: str) -> Dict[str, Any]:
+def _service_attributes(service: Any, input_value: str) -> dict[str, Any]:
     return {
         Attr.LLM_MODEL_NAME: getattr(service, "ai_model_id", None),
         Attr.INPUT_VALUE: input_value,
@@ -232,7 +232,7 @@ def _patch_ai_services() -> None:
             _service_attributes(service, _chat_history_text(chat_history)),
         )
         chunks = []
-        error: Optional[BaseException] = None
+        error: BaseException | None = None
         completed = False
         try:
             async for result in _original_streaming_chat_completion(
@@ -253,7 +253,7 @@ def _patch_ai_services() -> None:
     async def get_streaming_text_contents(service: Any, prompt: str, settings: Any) -> Any:
         scope = _start_scope("text.completions", SpanKind.LLM, _service_attributes(service, prompt))
         chunks = []
-        error: Optional[BaseException] = None
+        error: BaseException | None = None
         completed = False
         try:
             async for result in _original_streaming_text_completion(service, prompt, settings):
@@ -271,19 +271,15 @@ def _patch_ai_services() -> None:
 
     ChatCompletionClientBase.get_chat_message_contents = get_chat_message_contents  # type: ignore
     TextCompletionClientBase.get_text_contents = get_text_contents  # type: ignore
-    setattr(
-        ChatCompletionClientBase,
-        "get_streaming_chat_message_contents",
-        get_streaming_chat_message_contents,
+    chat_completion_client_base: Any = ChatCompletionClientBase
+    text_completion_client_base: Any = TextCompletionClientBase
+    chat_completion_client_base.get_streaming_chat_message_contents = (
+        get_streaming_chat_message_contents
     )
-    setattr(
-        TextCompletionClientBase,
-        "get_streaming_text_contents",
-        get_streaming_text_contents,
-    )
+    text_completion_client_base.get_streaming_text_contents = get_streaming_text_contents
 
 
-def _agent_attributes(agent: Any, messages: Any) -> Dict[str, Any]:
+def _agent_attributes(agent: Any, messages: Any) -> dict[str, Any]:
     return {
         "agent.name": getattr(agent, "name", type(agent).__name__),
         "agent.description": getattr(agent, "description", None),
@@ -311,7 +307,7 @@ def _patch_chat_completion_agent() -> None:
 
     async def invoke(agent: Any, messages: Any = None, **kwargs: Any) -> Any:
         scope = _start_scope("agent.invoke", SpanKind.AGENT, _agent_attributes(agent, messages))
-        error: Optional[BaseException] = None
+        error: BaseException | None = None
         try:
             async for result in _original_agent_invoke(agent, messages, **kwargs):
                 yield result
@@ -323,7 +319,7 @@ def _patch_chat_completion_agent() -> None:
 
     async def invoke_stream(agent: Any, messages: Any = None, **kwargs: Any) -> Any:
         scope = _start_scope("agent.invoke", SpanKind.AGENT, _agent_attributes(agent, messages))
-        error: Optional[BaseException] = None
+        error: BaseException | None = None
         try:
             async for result in _original_agent_invoke_stream(agent, messages, **kwargs):
                 yield result
@@ -357,7 +353,7 @@ def patch() -> None:
             _patch_ai_services()
             _patch_chat_completion_agent()
             _patched = True
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "observra: failed to install Semantic Kernel instrumentation", exc_info=True
             )

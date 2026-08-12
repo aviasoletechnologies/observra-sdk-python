@@ -17,7 +17,7 @@ from __future__ import annotations
 import functools
 import logging
 import threading
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 
@@ -55,13 +55,13 @@ _patched = False
 _patch_lock = threading.Lock()
 
 
-def _build_mounts(*, is_async: bool) -> Dict[str, Any]:
+def _build_mounts(*, is_async: bool) -> dict[str, Any]:
     try:
         config = get_config()
     except ObservraConfigError:
         return {}  # observra.configure() not called yet — leave httpx untouched
 
-    mounts: Dict[str, Any] = {}
+    mounts: dict[str, Any] = {}
     for mount_pattern, profile_name in _PROVIDER_HOSTS.items():
         profile = get_trace_profile(profile_name)
         transport_kwargs = profile.transport_kwargs()
@@ -75,7 +75,7 @@ def _build_mounts(*, is_async: bool) -> Dict[str, Any]:
     return mounts
 
 
-def _inject_mounts(kwargs: Dict[str, Any], *, is_async: bool) -> Dict[str, Any]:
+def _inject_mounts(kwargs: dict[str, Any], *, is_async: bool) -> dict[str, Any]:
     """Merge in a per-host mount for each known provider host.
 
     Deliberately does *not* back off just because the caller set a root
@@ -111,7 +111,7 @@ def patch() -> None:
         def patched_client_init(self: httpx.Client, *args: Any, **kwargs: Any) -> None:
             try:
                 kwargs = _inject_mounts(kwargs, is_async=False)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("observra: failed to inject gateway mounts into httpx.Client", exc_info=True)
             original_client_init(self, *args, **kwargs)
 
@@ -119,7 +119,7 @@ def patch() -> None:
         def patched_async_client_init(self: httpx.AsyncClient, *args: Any, **kwargs: Any) -> None:
             try:
                 kwargs = _inject_mounts(kwargs, is_async=True)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("observra: failed to inject gateway mounts into httpx.AsyncClient", exc_info=True)
             original_async_client_init(self, *args, **kwargs)
 

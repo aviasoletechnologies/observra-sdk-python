@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -16,7 +17,7 @@ from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 logger = logging.getLogger("observra")
 
 
-def _span_to_dict(span: ReadableSpan) -> Dict[str, Any]:
+def _span_to_dict(span: ReadableSpan) -> dict[str, Any]:
     ctx = span.get_span_context()
     trace_id = ctx.trace_id if ctx is not None else 0
     span_id = ctx.span_id if ctx is not None else 0
@@ -57,7 +58,7 @@ class GatewayExporter(SpanExporter):
         try:
             for span in spans:
                 print(json.dumps(_span_to_dict(span), indent=2, default=str))
-        except Exception:  # noqa: BLE001 - telemetry path must never raise
+        except Exception:
             logger.warning("observra: failed to print spans", exc_info=True)
             return SpanExportResult.FAILURE
 

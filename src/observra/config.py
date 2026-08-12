@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -43,7 +42,7 @@ class ObservraConfig(BaseModel):
     insecure: bool = False
 
     @model_validator(mode="after")
-    def _validate(self) -> "ObservraConfig":
+    def _validate(self) -> ObservraConfig:
         if not self.gateway_url:
             raise ObservraConfigError("gateway_url is required")
         if not self.gateway_key:
@@ -67,13 +66,13 @@ class ObservraConfig(BaseModel):
 
 
 _lock = threading.Lock()
-_singleton: Optional[ObservraConfig] = None
+_singleton: ObservraConfig | None = None
 
 
 def configure(
     *,
-    gateway_url: Optional[str] = None,
-    gateway_key: Optional[str] = None,
+    gateway_url: str | None = None,
+    gateway_key: str | None = None,
     insecure: bool = False,
 ) -> ObservraConfig:
     """Build and install the module-level config singleton.
@@ -115,7 +114,7 @@ def _auto_patch_installed_providers() -> None:
         from observra.providers.registry import auto_patch_providers
 
         auto_patch_providers()
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: provider auto-patch failed", exc_info=True)
 
 

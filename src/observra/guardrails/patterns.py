@@ -14,7 +14,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class GuardrailPattern:
     name: str
-    regex: "re.Pattern[str]"
+    regex: re.Pattern[str]
 
 
 BUILTIN_PATTERNS = [

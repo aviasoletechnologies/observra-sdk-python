@@ -15,7 +15,7 @@ import json
 import logging
 import time
 from contextlib import nullcontext
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional
 
 import httpx
 
@@ -37,20 +37,20 @@ GUARDRAIL_MODE = "warn"
 
 ExtractModelName = Callable[[str], Optional[str]]
 ExtractText = Callable[[str], Optional[str]]
-ExtractUsage = Callable[[str], Tuple[Optional[int], Optional[int]]]
+ExtractUsage = Callable[[str], tuple[Optional[int], Optional[int]]]
 
 
-def _default_extract_model_name(_body_text: str) -> Optional[str]:
+def _default_extract_model_name(_body_text: str) -> str | None:
     return None
 
 
-def _default_extract_text(body_text: str) -> Optional[str]:
+def _default_extract_text(body_text: str) -> str | None:
     if not body_text:
         return None
     return body_text[:MAX_ATTR_TEXT_LEN]
 
 
-def _default_extract_usage(_body_text: str) -> Tuple[Optional[int], Optional[int]]:
+def _default_extract_usage(_body_text: str) -> tuple[int | None, int | None]:
     return None, None
 
 
@@ -76,12 +76,12 @@ class _ObservraTransportCore:
         span_name: str = "llm.generate_content",
         span_kind: str = SpanKind.LLM,
         provider_name: str = "unknown",
-        gateway_route: Optional[str] = None,
-        extract_model_name: Optional[ExtractModelName] = None,
-        extract_input_text: Optional[ExtractText] = None,
-        extract_output_text: Optional[ExtractText] = None,
-        extract_usage: Optional[ExtractUsage] = None,
-        on_response_body: Optional[Callable[[str, Any], None]] = None,
+        gateway_route: str | None = None,
+        extract_model_name: ExtractModelName | None = None,
+        extract_input_text: ExtractText | None = None,
+        extract_output_text: ExtractText | None = None,
+        extract_usage: ExtractUsage | None = None,
+        on_response_body: Callable[[str, Any], None] | None = None,
     ) -> None:
         self._config = config
         self._tracer = get_tracer(config)
@@ -126,7 +126,7 @@ class _ObservraTransportCore:
                 del headers["authorization"]
         try:
             inject_traceparent(headers)
-        except Exception:  # noqa: BLE001 - tracing must never block the call
+        except Exception:
             logger.warning("observra: failed to inject traceparent", exc_info=True)
 
         return httpx.Request(
@@ -142,7 +142,7 @@ class _ObservraTransportCore:
             result = check_payload(text, GUARDRAIL_MODE)
         except GuardrailViolation:
             raise  # deliberate product-decision exception (requirement #1) — must propagate
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "observra: guardrail check failed, passing payload through unchanged",
                 exc_info=True,
@@ -186,7 +186,7 @@ class _ObservraTransportCore:
                     Attr.INPUT_VALUE: self._extract_input_text(body_text),
                 },
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to record request attributes", exc_info=True)
 
         return request
@@ -221,11 +221,11 @@ class _ObservraTransportCore:
             if self._on_response_body is not None:
                 try:
                     self._on_response_body(out_text, span)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.warning("observra: on_response_body hook raised", exc_info=True)
         except GuardrailViolation:
             raise
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to record response attributes", exc_info=True)
 
         return response
@@ -246,7 +246,7 @@ class ObservraTransport(_ObservraTransportCore, httpx.BaseTransport):
         self,
         config: ObservraConfig,
         *,
-        inner: Optional[httpx.BaseTransport] = None,
+        inner: httpx.BaseTransport | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(config, **kwargs)
@@ -270,8 +270,8 @@ class ObservraTransport(_ObservraTransportCore, httpx.BaseTransport):
     def close(self) -> None:
         try:
             self._inner.close()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            logger.debug("observra: failed to close sync transport", exc_info=True)
 
 
 class AsyncObservraTransport(_ObservraTransportCore, httpx.AsyncBaseTransport):
@@ -281,7 +281,7 @@ class AsyncObservraTransport(_ObservraTransportCore, httpx.AsyncBaseTransport):
         self,
         config: ObservraConfig,
         *,
-        inner: Optional[httpx.AsyncBaseTransport] = None,
+        inner: httpx.AsyncBaseTransport | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(config, **kwargs)
@@ -302,14 +302,14 @@ class AsyncObservraTransport(_ObservraTransportCore, httpx.AsyncBaseTransport):
     async def aclose(self) -> None:
         try:
             await self._inner.aclose()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            logger.debug("observra: failed to close async transport", exc_info=True)
 
 
 def json_text_extractor(*keys: str) -> ExtractText:
     """Build an extractor that pulls a dotted/nested key path out of a JSON body, truncated."""
 
-    def _extract(body_text: str) -> Optional[str]:
+    def _extract(body_text: str) -> str | None:
         try:
             data = json.loads(body_text)
         except (json.JSONDecodeError, TypeError):

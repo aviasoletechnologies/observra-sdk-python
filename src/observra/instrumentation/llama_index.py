@@ -14,7 +14,7 @@ import json
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from observra.config import get_config
 from observra.tracing.context import activate_framework_llm_span, deactivate_framework_llm_span
@@ -36,7 +36,7 @@ _original_react_agent_take_step: Any = None
 _original_agent_workflow_run: Any = None
 
 
-def _parse_version(raw: str) -> Tuple[int, ...]:
+def _parse_version(raw: str) -> tuple[int, ...]:
     parts = []
     for chunk in raw.split(".")[:3]:
         digits = "".join(c for c in chunk if c.isdigit())
@@ -46,10 +46,10 @@ def _parse_version(raw: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def _tracer_or_none() -> Optional[ObservraTracer]:
+def _tracer_or_none() -> ObservraTracer | None:
     try:
         return get_tracer(get_config())
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning(
             "observra: LlamaIndex instrumentation active but observra.configure() "
             "was never called; skipping trace for this run",
@@ -79,7 +79,7 @@ def _safe_str(value: Any) -> str:
         return str(value)[:4000]
 
 
-_EVENT_KIND_MAP: Dict[str, str] = {
+_EVENT_KIND_MAP: dict[str, str] = {
     "LLM": SpanKind.LLM,
     "EMBEDDING": SpanKind.LLM,
     "AGENT_STEP": SpanKind.AGENT,
@@ -123,10 +123,10 @@ class ObservraLlamaIndexCallbackHandler(_base_handler_class()):  # type: ignore[
             super().__init__(event_starts_to_ignore=[], event_ends_to_ignore=[])
         except TypeError:
             pass  # base_handler_class() fell back to plain object — no-op
-        self._events: Dict[str, _EventState] = {}
+        self._events: dict[str, _EventState] = {}
         self._lock = threading.Lock()
 
-    def _parent_state(self, parent_id: str) -> Optional[_EventState]:
+    def _parent_state(self, parent_id: str) -> _EventState | None:
         if not parent_id:
             return None
         with self._lock:
@@ -139,7 +139,7 @@ class ObservraLlamaIndexCallbackHandler(_base_handler_class()):  # type: ignore[
     def on_event_start(
         self,
         event_type: Any,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         event_id: str = "",
         parent_id: str = "",
         **kwargs: Any,
@@ -196,7 +196,7 @@ class ObservraLlamaIndexCallbackHandler(_base_handler_class()):  # type: ignore[
                     framework_llm_token=framework_llm_token,
                     event_type=type_name,
                 )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to start span for LlamaIndex event", exc_info=True)
 
         return event_id
@@ -204,7 +204,7 @@ class ObservraLlamaIndexCallbackHandler(_base_handler_class()):  # type: ignore[
     def on_event_end(
         self,
         event_type: Any,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         event_id: str = "",
         **kwargs: Any,
     ) -> None:
@@ -225,16 +225,16 @@ class ObservraLlamaIndexCallbackHandler(_base_handler_class()):  # type: ignore[
             if state.framework_llm_token is not None:
                 deactivate_framework_llm_span(state.framework_llm_token)
             otel_context.detach(state.context_token)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to end span for LlamaIndex event", exc_info=True)
 
-    def start_trace(self, trace_id: Optional[str] = None) -> None:
+    def start_trace(self, trace_id: str | None = None) -> None:
         pass
 
     def end_trace(
         self,
-        trace_id: Optional[str] = None,
-        trace_map: Optional[Dict[str, Any]] = None,
+        trace_id: str | None = None,
+        trace_map: dict[str, Any] | None = None,
     ) -> None:
         pass
 
@@ -243,7 +243,7 @@ _handler = ObservraLlamaIndexCallbackHandler()
 
 
 def _handlers_with_observra(
-    handlers: Optional[list[Any]],
+    handlers: list[Any] | None,
 ) -> list[Any]:
     """Return callback handlers with this integration attached exactly once."""
     configured_handlers = list(handlers or [])
@@ -255,7 +255,7 @@ def _handlers_with_observra(
     return configured_handlers
 
 
-def _tool_attributes(tool: Any, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> Dict[str, str]:
+def _tool_attributes(tool: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, str]:
     return {
         Attr.FRAMEWORK: "llama_index",
         Attr.LLAMA_INDEX_EVENT_NAME: "FUNCTION_CALL",
@@ -267,7 +267,7 @@ def _tool_attributes(tool: Any, args: tuple[Any, ...], kwargs: Dict[str, Any]) -
 def _finish_tool_span(
     span: Any,
     result: Any = None,
-    error: Optional[BaseException] = None,
+    error: BaseException | None = None,
 ) -> None:
     if result is not None:
         safe_set_attributes(span, {Attr.TOOL_RESULT: _safe_str(result)})
@@ -457,8 +457,11 @@ def patch() -> None:
                     ".".join(map(str, _TESTED_MAX)),
                 )
                 return
-        except Exception:  # noqa: BLE001
-            pass  # version undeterminable: proceed, best-effort
+        except Exception:
+            logger.debug(
+                "observra: could not determine LlamaIndex version; proceeding with instrumentation",
+                exc_info=True,
+            )
 
         try:
             from llama_index.core import Settings
@@ -473,7 +476,7 @@ def patch() -> None:
 
             _original_callback_manager_init = CallbackManager.__init__
 
-            def callback_manager_init(self: Any, handlers: Optional[list[Any]] = None) -> None:
+            def callback_manager_init(self: Any, handlers: list[Any] | None = None) -> None:
                 _original_callback_manager_init(self, _handlers_with_observra(handlers))
 
             CallbackManager.__init__ = callback_manager_init  # type: ignore[method-assign]
@@ -481,7 +484,7 @@ def patch() -> None:
             _patch_agent_steps()
             _patch_agent_workflow_run()
             _patched = True
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "observra: failed to install LlamaIndex callback handler, skipping instrumentation",
                 exc_info=True,

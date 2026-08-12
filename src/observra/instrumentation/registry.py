@@ -8,9 +8,10 @@ Every patch is idempotent and failure-isolated.
 from __future__ import annotations
 
 import importlib
-import importlib.util
 import logging
 import threading
+
+from observra._optional import module_available
 
 logger = logging.getLogger("observra")
 
@@ -39,7 +40,7 @@ def instrument() -> None:
         from observra.providers.registry import auto_patch_providers
 
         auto_patch_providers()
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: failed to instrument provider SDKs and httpx", exc_info=True)
 
     for framework_module, instrumentation_module in _SUPPORTED_FRAMEWORKS.items():
@@ -50,11 +51,11 @@ def _maybe_instrument(framework_module: str, instrumentation_module: str) -> Non
     with _lock:
         if framework_module in _instrumented:
             return
-        if importlib.util.find_spec(framework_module) is None:
+        if not module_available(framework_module):
             return
         try:
             mod = importlib.import_module(instrumentation_module)
             mod.patch()
             _instrumented.add(framework_module)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to instrument %r", framework_module, exc_info=True)

@@ -11,8 +11,6 @@ instead of being hardcoded at every call site.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
-
 from observra.config import get_config
 
 # Header a given provider expects its own API key under, when forwarded
@@ -32,7 +30,7 @@ def gateway_url(provider: str, path: str = "") -> str:
     return f"{base}/{provider}{path}"
 
 
-def gateway_headers(provider: str, *, provider_key: Optional[str] = None) -> Dict[str, str]:
+def gateway_headers(provider: str, *, provider_key: str | None = None) -> dict[str, str]:
     """Build the headers the gateway expects for a request to ``provider``.
 
     Always includes ``x-gateway-key``. Pass ``provider_key`` (the actual
