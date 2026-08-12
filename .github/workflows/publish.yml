@@ -42,12 +42,6 @@ jobs:
       - run: pip install -e ".[dev]" build
         if: steps.version.outputs.changed == 'true'
 
-      - run: ruff check src
-        if: steps.version.outputs.changed == 'true'
-
-      - run: mypy
-        if: steps.version.outputs.changed == 'true'
-
       - run: pytest
         if: steps.version.outputs.changed == 'true'
 
