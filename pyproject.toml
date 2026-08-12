@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "observra"
+name = "observra-sdk-python"
 version = "0.1.0"
 description = "Observra Python SDK - drop-in traced, guardrailed LLM clients routed through the Observra gateway"
 readme = "README.md"
