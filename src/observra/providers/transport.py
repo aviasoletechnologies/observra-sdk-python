@@ -118,6 +118,9 @@ class _ObservraTransportCore:
         # ``raw_path`` includes both path and query, e.g. ``/v1beta/models/x?y=1``.
         new_url = httpx.URL(f"{base}/{self._gateway_route}{original_path}")
         headers = httpx.Headers(request.headers)
+        # The original provider Host header selects the wrong virtual host at
+        # the gateway. Let httpx derive Host from the rewritten gateway URL.
+        headers.pop("host", None)
         headers["x-gateway-key"] = self._config.gateway_key
         if "x-provider-key" not in headers:
             scheme, _, provider_key = headers.get("authorization", "").partition(" ")
