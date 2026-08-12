@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "observra"
+version = "0.1.0"
+description = "Observra Python SDK - drop-in traced, guardrailed LLM clients routed through the Observra gateway"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Observra" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+dependencies = [
+    "httpx>=0.24",
+    "opentelemetry-api>=1.20,<2",
+    "opentelemetry-sdk>=1.20,<2",
+    "pydantic>=2,<3",
+]
+
+[project.optional-dependencies]
+gemini = ["google-genai==2.16.0"]
+openai = ["openai==1.109.1"]
+anthropic = ["anthropic==0.120.2"]
+examples = ["python-dotenv==1.2.2"]
+langchain = ["langchain>=0.2,<2.0", "langchain-core>=0.2,<2.0"]
+langgraph = ["langgraph>=1.2.10,<2.0"]
+semantic-kernel = ["semantic-kernel==1.38.0", "google-generativeai==0.8.6"]
+dev = [
+    "ruff",
+    "black",
+    "mypy",
+    "pytest",
+    "pytest-asyncio",
+    "respx",
+    "langchain>=0.2,<2.0",
+    "langchain-core>=0.2,<2.0",
+    "langchain-google-genai",
+    "openai",
+    "anthropic",
+    "together==2.24.0",
+    "mistralai==2.5.2",
+    "cohere==7.0.0",
+    "llama-index-core",
+    "llama-index-llms-openai-like==0.3.5",
+    "crewai",
+    "langgraph>=1.2.10,<2.0",
+    "semantic-kernel==1.38.0",
+    "google-generativeai==0.8.6",
+]
+
+[project.urls]
+Homepage = "https://observra.in"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/observra"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.mypy]
+# 3.12 here only avoids a numpy stub parse error pulled in transitively by
+# optional dev deps (crewai/llama-index) — our own code still targets 3.9+
+# (requires-python above), enforced by never using post-3.9 syntax.
+python_version = "3.12"
+strict = true
+packages = ["observra"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
