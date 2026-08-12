@@ -9,7 +9,8 @@ description = "Observra Python SDK - drop-in traced, guardrailed LLM clients rou
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }
-authors = [{ name = "Observra" }]
+authors = [{ name = "Aviasole" }]
+maintainers = [{ name = "Aviasole" }]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
