@@ -8,8 +8,8 @@ through unscanned and unredacted in that case.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence
 
 from observra.guardrails.patterns import BUILTIN_PATTERNS, GuardrailPattern
 
@@ -43,7 +43,7 @@ class GuardrailViolation(Exception):
 
 @dataclass
 class CheckResult:
-    violations: List[Violation] = field(default_factory=list)
+    violations: list[Violation] = field(default_factory=list)
     redacted_payload: str = ""
 
     @property
@@ -72,7 +72,7 @@ def check_payload(
     payload: str,
     mode: str = "warn",
     *,
-    patterns: Optional[Sequence[GuardrailPattern]] = None,
+    patterns: Sequence[GuardrailPattern] | None = None,
 ) -> CheckResult:
     """Scan ``payload`` for guardrail pattern matches and act per ``mode``.
 
@@ -92,7 +92,7 @@ def check_payload(
 
     scanned, remainder = text[:MAX_SCAN_CHARS], text[MAX_SCAN_CHARS:]
 
-    violations: List[Violation] = []
+    violations: list[Violation] = []
     for pattern in active_patterns:
         for match in pattern.regex.finditer(scanned):
             violations.append(Violation(pattern.name, match.start(), match.end(), match.group(0)))

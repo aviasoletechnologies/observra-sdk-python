@@ -8,14 +8,15 @@ needs on top of that — it does not reimplement propagation.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from contextvars import ContextVar, Token
-from typing import Any, Dict, MutableMapping, Optional
+from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 _propagator = TraceContextTextMapPropagator()
-_framework_llm_span: ContextVar[Optional[Any]] = ContextVar(
+_framework_llm_span: ContextVar[Any | None] = ContextVar(
     "observra_framework_llm_span",
     default=None,
 )
@@ -31,7 +32,7 @@ def deactivate_framework_llm_span(token: Token[Any]) -> None:
     _framework_llm_span.reset(token)
 
 
-def active_framework_llm_span() -> Optional[Any]:
+def active_framework_llm_span() -> Any | None:
     """Return active framework LLM span only when it still matches OTel context."""
     span = _framework_llm_span.get()
     if span is None:
@@ -44,14 +45,14 @@ def active_framework_llm_span() -> Optional[Any]:
     return None
 
 
-def current_traceparent() -> Optional[str]:
+def current_traceparent() -> str | None:
     """Return the ``traceparent`` header string for the currently active span, if any."""
     span = trace.get_current_span()
     ctx = span.get_span_context()
     if not ctx.is_valid:
         return None
 
-    carrier: Dict[str, str] = {}
+    carrier: dict[str, str] = {}
     _propagator.inject(carrier)
     return carrier.get("traceparent")
 

@@ -16,7 +16,7 @@ import functools
 import json
 import logging
 import threading
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable
 
 import httpx
 
@@ -37,7 +37,7 @@ _patched = False
 _patch_lock = threading.Lock()
 
 
-def _parse_version(raw: str) -> Tuple[int, ...]:
+def _parse_version(raw: str) -> tuple[int, ...]:
     parts = []
     for chunk in raw.split(".")[:3]:
         digits = "".join(c for c in chunk if c.isdigit())
@@ -69,7 +69,7 @@ def _check_genai_version() -> None:
         logger.warning("observra: could not parse google-genai version %r", installed_raw)
 
 
-def _extract_function_calls(body_text: str) -> List[Dict[str, Any]]:
+def _extract_function_calls(body_text: str) -> list[dict[str, Any]]:
     try:
         data = json.loads(body_text)
         candidates = data.get("candidates") or []
@@ -123,7 +123,7 @@ def _wrap_tool_for_tracing(fn: Any, tracer: ObservraTracer) -> Any:
     return wrapper
 
 
-def _wrap_tools_kwarg(kwargs: Dict[str, Any], tracer: ObservraTracer) -> Dict[str, Any]:
+def _wrap_tools_kwarg(kwargs: dict[str, Any], tracer: ObservraTracer) -> dict[str, Any]:
     """Wrap any Python-callable tools for span tracing.
 
     ``google-genai`` takes tools via ``config=GenerateContentConfig(tools=[...])``
@@ -154,13 +154,13 @@ def _wrap_tools_kwarg(kwargs: Dict[str, Any], tracer: ObservraTracer) -> Dict[st
                 else:
                     try:
                         config.tools = wrapped_tools
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         logger.warning("observra: could not wrap tools on config object for tracing", exc_info=True)
 
     return kwargs
 
 
-def _transport_kwargs(tracer: ObservraTracer) -> Dict[str, Any]:
+def _transport_kwargs(tracer: ObservraTracer) -> dict[str, Any]:
     return {
         **GEMINI_PROFILE.transport_kwargs(),
         "span_kind": SpanKind.LLM,
@@ -184,7 +184,7 @@ def _http_options_field(http_options: Any, field: str) -> Any:
     return getattr(http_options, field, None)
 
 
-def _http_options_as_dict(http_options: Any) -> Dict[str, Any]:
+def _http_options_as_dict(http_options: Any) -> dict[str, Any]:
     if http_options is None:
         return {}
     if isinstance(http_options, dict):
@@ -194,7 +194,7 @@ def _http_options_as_dict(http_options: Any) -> Dict[str, Any]:
     return {}
 
 
-def _inject_gateway_http_options(genai_module: Any, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def _inject_gateway_http_options(genai_module: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Inject the gateway transport into ``Client(http_options=...)`` unless the caller already set one."""
     try:
         config = get_config()
@@ -241,7 +241,7 @@ def patch() -> None:
         def patched_client_init(self: Any, *args: Any, **kwargs: Any) -> None:
             try:
                 kwargs = _inject_gateway_http_options(genai, kwargs)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("observra: failed to inject gateway transport into genai.Client", exc_info=True)
             original_client_init(self, *args, **kwargs)
 
@@ -257,7 +257,7 @@ def patch() -> None:
                 kwargs = _wrap_tools_kwarg(kwargs, get_tracer(config))
             except ObservraConfigError:
                 pass
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("observra: failed to wrap tools for tracing", exc_info=True)
             return original_sync_generate(self, *args, **kwargs)
 
@@ -268,7 +268,7 @@ def patch() -> None:
                 kwargs = _wrap_tools_kwarg(kwargs, get_tracer(config))
             except ObservraConfigError:
                 pass
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("observra: failed to wrap tools for tracing", exc_info=True)
             return await original_async_generate(self, *args, **kwargs)
 

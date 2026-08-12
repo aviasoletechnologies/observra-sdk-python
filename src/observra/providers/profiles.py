@@ -7,8 +7,9 @@ span lifecycle, context propagation, and transport I/O remain in transport.py.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any
 
 from observra.providers.transport import (
     MAX_ATTR_TEXT_LEN,
@@ -26,11 +27,11 @@ def _json_object(body_text: str) -> Mapping[str, Any]:
         return {}
 
 
-def _truncate(value: str) -> Optional[str]:
+def _truncate(value: str) -> str | None:
     return value[:MAX_ATTR_TEXT_LEN] if value else None
 
 
-def _content_text(value: Any) -> Optional[str]:
+def _content_text(value: Any) -> str | None:
     """Extract human-readable text from common provider content shapes."""
     if isinstance(value, str):
         return _truncate(value)
@@ -54,16 +55,16 @@ def _content_text(value: Any) -> Optional[str]:
     return None
 
 
-def _model(body_text: str) -> Optional[str]:
+def _model(body_text: str) -> str | None:
     model = _json_object(body_text).get("model")
     return model if isinstance(model, str) else None
 
 
-def _openai_input(body_text: str) -> Optional[str]:
+def _openai_input(body_text: str) -> str | None:
     return _content_text(_json_object(body_text).get("messages"))
 
 
-def _openai_output(body_text: str) -> Optional[str]:
+def _openai_output(body_text: str) -> str | None:
     data = _json_object(body_text)
     choices = data.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
@@ -82,19 +83,19 @@ def _openai_output(body_text: str) -> Optional[str]:
     return _truncate(body_text)
 
 
-def _openai_usage(body_text: str) -> Tuple[Optional[int], Optional[int]]:
+def _openai_usage(body_text: str) -> tuple[int | None, int | None]:
     usage = _json_object(body_text).get("usage")
     if not isinstance(usage, dict):
         return None, None
     return usage.get("prompt_tokens"), usage.get("completion_tokens")
 
 
-def _anthropic_input(body_text: str) -> Optional[str]:
+def _anthropic_input(body_text: str) -> str | None:
     data = _json_object(body_text)
     return _content_text(data.get("system")) or _content_text(data.get("messages"))
 
 
-def _anthropic_output(body_text: str) -> Optional[str]:
+def _anthropic_output(body_text: str) -> str | None:
     content = _json_object(body_text).get("content")
     text = _content_text(content)
     if text:
@@ -106,19 +107,19 @@ def _anthropic_output(body_text: str) -> Optional[str]:
     return _truncate(body_text)
 
 
-def _anthropic_usage(body_text: str) -> Tuple[Optional[int], Optional[int]]:
+def _anthropic_usage(body_text: str) -> tuple[int | None, int | None]:
     usage = _json_object(body_text).get("usage")
     if not isinstance(usage, dict):
         return None, None
     return usage.get("input_tokens"), usage.get("output_tokens")
 
 
-def _ollama_input(body_text: str) -> Optional[str]:
+def _ollama_input(body_text: str) -> str | None:
     data = _json_object(body_text)
     return _content_text(data.get("messages")) or _content_text(data.get("prompt"))
 
 
-def _ollama_output(body_text: str) -> Optional[str]:
+def _ollama_output(body_text: str) -> str | None:
     data = _json_object(body_text)
     return (
         _content_text(data.get("message"))
@@ -127,16 +128,16 @@ def _ollama_output(body_text: str) -> Optional[str]:
     )
 
 
-def _ollama_usage(body_text: str) -> Tuple[Optional[int], Optional[int]]:
+def _ollama_usage(body_text: str) -> tuple[int | None, int | None]:
     data = _json_object(body_text)
     return data.get("prompt_eval_count"), data.get("eval_count")
 
 
-def _gemini_input(body_text: str) -> Optional[str]:
+def _gemini_input(body_text: str) -> str | None:
     return _content_text(_json_object(body_text).get("contents"))
 
 
-def _gemini_output(body_text: str) -> Optional[str]:
+def _gemini_output(body_text: str) -> str | None:
     data = _json_object(body_text)
     candidates = data.get("candidates")
     if not isinstance(candidates, list) or not candidates or not isinstance(candidates[0], dict):
@@ -154,7 +155,7 @@ def _gemini_output(body_text: str) -> Optional[str]:
     return _truncate(body_text)
 
 
-def _gemini_usage(body_text: str) -> Tuple[Optional[int], Optional[int]]:
+def _gemini_usage(body_text: str) -> tuple[int | None, int | None]:
     usage = _json_object(body_text).get("usageMetadata")
     if not isinstance(usage, dict):
         return None, None

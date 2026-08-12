@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import List, Optional
 
 import httpx
 
@@ -35,10 +34,10 @@ class PolicyClient:
         self._gateway_key = gateway_key
         self._ttl_seconds = ttl_seconds
         self._timeout = timeout
-        self._cached_patterns: Optional[List[GuardrailPattern]] = None
+        self._cached_patterns: list[GuardrailPattern] | None = None
         self._cached_at: float = 0.0
 
-    def get_patterns(self) -> List[GuardrailPattern]:
+    def get_patterns(self) -> list[GuardrailPattern]:
         now = time.monotonic()
         if self._cached_patterns is not None and (now - self._cached_at) < self._ttl_seconds:
             return self._cached_patterns
@@ -48,7 +47,7 @@ class PolicyClient:
         self._cached_at = now
         return self._cached_patterns
 
-    def _fetch(self) -> Optional[List[GuardrailPattern]]:
+    def _fetch(self) -> list[GuardrailPattern] | None:
         try:
             with httpx.Client(timeout=self._timeout) as client:
                 response = client.get(
@@ -57,7 +56,7 @@ class PolicyClient:
                 )
                 response.raise_for_status()
                 data = response.json()
-        except Exception:  # noqa: BLE001 - policy fetch must never break client init
+        except Exception:
             logger.warning(
                 "observra: guardrail policy fetch failed, falling back to built-in patterns",
                 exc_info=True,
@@ -70,7 +69,7 @@ class PolicyClient:
                 for item in data.get("patterns", [])
             ]
             return patterns or None
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "observra: guardrail policy payload malformed, falling back to built-in patterns",
                 exc_info=True,

@@ -28,11 +28,11 @@ from observra.instrumentation.registry import instrument
 __version__ = "0.1.0"
 
 __all__ = [
-    "configure",
-    "ObservraConfig",
-    "gateway_url",
-    "gateway_headers",
-    "instrument",
     "GuardrailViolation",
+    "ObservraConfig",
     "__version__",
+    "configure",
+    "gateway_headers",
+    "gateway_url",
+    "instrument",
 ]

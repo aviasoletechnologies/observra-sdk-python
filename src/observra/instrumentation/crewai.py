@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """CrewAI event-bus instrumentation for crews, flows, agents, LLMs, and tools.
 
 CrewAI emits public lifecycle events for normal LLM calls and agentic execution.
@@ -13,8 +12,9 @@ import importlib
 import json
 import logging
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any
 
 from observra.config import get_config
 from observra.tracing.context import activate_framework_llm_span, deactivate_framework_llm_span
@@ -40,10 +40,10 @@ _original_emit_llm_start: Any = None
 _original_emit_llm_complete: Any = None
 _original_emit_llm_failed: Any = None
 _llm_scope_lock = threading.Lock()
-_llm_scope_tokens: Dict[str, Tuple[Any, Any]] = {}
+_llm_scope_tokens: dict[str, tuple[Any, Any]] = {}
 
 
-def _parse_version(raw: str) -> Tuple[int, ...]:
+def _parse_version(raw: str) -> tuple[int, ...]:
     parts = []
     for chunk in raw.split(".")[:3]:
         digits = "".join(character for character in chunk if character.isdigit())
@@ -53,10 +53,10 @@ def _parse_version(raw: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def _tracer_or_none() -> Optional[ObservraTracer]:
+def _tracer_or_none() -> ObservraTracer | None:
     try:
         return get_tracer(get_config())
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning(
             "observra: CrewAI instrumentation active but observra.configure() "
             "was never called; skipping trace for this run",
@@ -114,7 +114,7 @@ class _SpanState:
 
 class _SpanTracker:
     def __init__(self) -> None:
-        self._by_key: Dict[Any, _SpanState] = {}
+        self._by_key: dict[Any, _SpanState] = {}
         self._lock = threading.Lock()
 
     def _parent_span(self, parent_keys: Iterable[Any]) -> Any:
@@ -130,7 +130,7 @@ class _SpanTracker:
         key: Any,
         name: str,
         kind: str,
-        attributes: Dict[str, Any],
+        attributes: dict[str, Any],
         *,
         parent_keys: Iterable[Any] = (),
         framework_llm: bool = False,
@@ -160,14 +160,14 @@ class _SpanTracker:
 
             with self._lock:
                 self._by_key[key] = _SpanState(span=span)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to start span for CrewAI event", exc_info=True)
 
     def end(
         self,
         key: Any,
-        attributes: Optional[Dict[str, Any]] = None,
-        error: Optional[BaseException] = None,
+        attributes: dict[str, Any] | None = None,
+        error: BaseException | None = None,
     ) -> None:
         with self._lock:
             state = self._by_key.pop(key, None)
@@ -184,14 +184,14 @@ class _SpanTracker:
             if final_attributes:
                 safe_set_attributes(state.span, final_attributes)
             safe_end_span(state.span, error=error)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to end span for CrewAI event", exc_info=True)
 
     def add_event(
         self,
         key: Any,
         name: str,
-        attributes: Dict[str, Any],
+        attributes: dict[str, Any],
         *,
         stream_chunk: Any = None,
     ) -> None:
@@ -280,7 +280,7 @@ def _patch_llm_execution() -> None:
     BaseLLM._emit_call_failed_event = emit_failed  # type: ignore[method-assign]
 
 
-def _event_attributes(event: Any, *names: str) -> Dict[str, Any]:
+def _event_attributes(event: Any, *names: str) -> dict[str, Any]:
     return {
         name: _safe_str(getattr(event, name, None))
         for name in names
@@ -339,8 +339,8 @@ def _subscribe_if_present(
     event_bus: Any,
     module_name: str,
     start: str,
-    end: Optional[str],
-    failed: Optional[str],
+    end: str | None,
+    failed: str | None,
     name: str,
     kind: str,
     start_attributes: Any,
@@ -416,6 +416,17 @@ def _register_lifecycle_handlers(event_bus: Any) -> None:
         event_bus.on(thinking_type)(on_llm_thinking)
 
 
+def _get_event_bus() -> Any:
+    """Load CrewAI's event bus from supported public and legacy locations."""
+    try:
+        from crewai.events import crewai_event_bus
+
+        return crewai_event_bus
+    except ImportError:
+        legacy_events = importlib.import_module("crewai.utilities.events")
+        return legacy_events.__dict__["crewai_event_bus"]
+
+
 def patch() -> None:
     """Idempotently subscribe supported public CrewAI event lifecycles."""
     global _patched
@@ -430,16 +441,16 @@ def patch() -> None:
             if not (_TESTED_MIN <= version_tuple < _TESTED_MAX):
                 logger.warning("observra: crewai %s outside tested range; skipping instrumentation", installed)
                 return
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            logger.debug(
+                "observra: could not determine CrewAI version; proceeding with instrumentation",
+                exc_info=True,
+            )
 
         try:
-            try:
-                from crewai.events import crewai_event_bus
-            except ImportError:
-                from crewai.utilities.events import crewai_event_bus  # type: ignore[import-not-found, no-redef]
+            crewai_event_bus = _get_event_bus()
             _register_lifecycle_handlers(crewai_event_bus)
             _patch_llm_execution()
             _patched = True
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to subscribe to CrewAI event bus, skipping instrumentation", exc_info=True)

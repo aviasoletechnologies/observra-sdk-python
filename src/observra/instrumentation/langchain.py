@@ -13,7 +13,7 @@ import json
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from uuid import UUID
 
 from langchain_core.callbacks.base import BaseCallbackHandler
@@ -23,10 +23,10 @@ from observra.tracing.context import activate_framework_llm_span, deactivate_fra
 from observra.tracing.conventions import Attr, SpanKind
 from observra.tracing.tracer import (
     ObservraTracer,
+    get_tracer,
     safe_add_event,
     safe_end_span,
     safe_set_attributes,
-    get_tracer,
 )
 
 logger = logging.getLogger("observra")
@@ -38,7 +38,7 @@ _MAX_STREAM_EVENTS = 100
 
 _patched = False
 _patch_lock = threading.Lock()
-_original_langgraph_methods: Dict[str, Any] = {}
+_original_langgraph_methods: dict[str, Any] = {}
 
 
 @dataclass
@@ -48,10 +48,10 @@ class _RunState:
     framework: str
     langchain_llm_token: Any = None
     stream_token_count: int = 0
-    stream_parts: List[str] = field(default_factory=list)
+    stream_parts: list[str] = field(default_factory=list)
 
 
-def _parse_version(raw: str) -> Tuple[int, ...]:
+def _parse_version(raw: str) -> tuple[int, ...]:
     parts = []
     for chunk in raw.split(".")[:3]:
         digits = "".join(character for character in chunk if character.isdigit())
@@ -61,7 +61,7 @@ def _parse_version(raw: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def _installed_version() -> Optional[str]:
+def _installed_version() -> str | None:
     from importlib.metadata import PackageNotFoundError, version
 
     for distribution in ("langchain", "langchain-core"):
@@ -72,10 +72,10 @@ def _installed_version() -> Optional[str]:
     return None
 
 
-def _tracer_or_none() -> Optional[ObservraTracer]:
+def _tracer_or_none() -> ObservraTracer | None:
     try:
         return get_tracer(get_config())
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning(
             "observra: LangChain instrumentation active but observra.configure() "
             "was never called; skipping trace for this run",
@@ -93,17 +93,17 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
     """
 
     def __init__(self) -> None:
-        self._runs: Dict[UUID, _RunState] = {}
+        self._runs: dict[UUID, _RunState] = {}
         self._lock = threading.Lock()
 
-    def _parent_span(self, parent_run_id: Optional[UUID]) -> Any:
+    def _parent_span(self, parent_run_id: UUID | None) -> Any:
         if parent_run_id is None:
             return None
         with self._lock:
             parent = self._runs.get(parent_run_id)
             return parent.span if parent is not None else None
 
-    def _parent_framework(self, parent_run_id: Optional[UUID]) -> Optional[str]:
+    def _parent_framework(self, parent_run_id: UUID | None) -> str | None:
         if parent_run_id is None:
             return None
         with self._lock:
@@ -115,9 +115,9 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
         run_id: UUID,
         name: str,
         kind: str,
-        attributes: Dict[str, Any],
-        parent_run_id: Optional[UUID] = None,
-        framework: Optional[str] = None,
+        attributes: dict[str, Any],
+        parent_run_id: UUID | None = None,
+        framework: str | None = None,
     ) -> None:
         tracer = _tracer_or_none()
         if tracer is None:
@@ -157,14 +157,14 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
                     framework=framework_name,
                     langchain_llm_token=framework_llm_token,
                 )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to start span for LangChain run", exc_info=True)
 
     def _end(
         self,
         run_id: UUID,
-        attributes: Optional[Dict[str, Any]] = None,
-        error: Optional[BaseException] = None,
+        attributes: dict[str, Any] | None = None,
+        error: BaseException | None = None,
     ) -> None:
         with self._lock:
             state = self._runs.pop(run_id, None)
@@ -187,10 +187,10 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
             if state.langchain_llm_token is not None:
                 deactivate_framework_llm_span(state.langchain_llm_token)
             otel_context.detach(state.context_token)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to end span for LangChain run", exc_info=True)
 
-    def _event(self, run_id: Optional[UUID], name: str, attributes: Dict[str, Any]) -> None:
+    def _event(self, run_id: UUID | None, name: str, attributes: dict[str, Any]) -> None:
         if run_id is None:
             return
         with self._lock:
@@ -202,13 +202,13 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
 
     def on_chain_start(
         self,
-        serialized: Dict[str, Any],
-        inputs: Dict[str, Any],
+        serialized: dict[str, Any],
+        inputs: dict[str, Any],
         *,
         run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        parent_run_id: UUID | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         qualified_name = ".".join((serialized or {}).get("id", []))
@@ -223,7 +223,7 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
             _framework_name(name, qualified_name, tags, metadata),
         )
 
-    def on_chain_end(self, outputs: Dict[str, Any], *, run_id: UUID, **kwargs: Any) -> None:
+    def on_chain_end(self, outputs: dict[str, Any], *, run_id: UUID, **kwargs: Any) -> None:
         self._end(run_id, {Attr.OUTPUT_VALUE: _safe_str(outputs)})
 
     def on_chain_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
@@ -239,11 +239,11 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
 
     def on_llm_start(
         self,
-        serialized: Dict[str, Any],
-        prompts: List[str],
+        serialized: dict[str, Any],
+        prompts: list[str],
         *,
         run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
+        parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
         model_name = _extract_model_name(serialized, kwargs)
@@ -260,11 +260,11 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
 
     def on_chat_model_start(
         self,
-        serialized: Dict[str, Any],
-        messages: List[List[Any]],
+        serialized: dict[str, Any],
+        messages: list[list[Any]],
         *,
         run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
+        parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
         model_name = _extract_model_name(serialized, kwargs)
@@ -317,11 +317,11 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
 
     def on_tool_start(
         self,
-        serialized: Dict[str, Any],
+        serialized: dict[str, Any],
         input_str: str,
         *,
         run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
+        parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
         name = (serialized or {}).get("name", "tool")
@@ -343,11 +343,11 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
 
     def on_retriever_start(
         self,
-        serialized: Dict[str, Any],
+        serialized: dict[str, Any],
         query: str,
         *,
         run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
+        parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
         name = (serialized or {}).get("name", "retriever")
@@ -379,7 +379,7 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
         name: str,
         data: Any,
         *,
-        run_id: Optional[UUID] = None,
+        run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
         self._event(
@@ -392,8 +392,8 @@ class ObservraLangChainCallbackHandler(BaseCallbackHandler):
 def _framework_name(
     name: str,
     qualified_name: str,
-    tags: Optional[List[str]],
-    metadata: Optional[Dict[str, Any]],
+    tags: list[str] | None,
+    metadata: dict[str, Any] | None,
 ) -> str:
     """Classify LangGraph callbacks and leave normal LangChain runs unchanged."""
     identity = " ".join(
@@ -405,8 +405,8 @@ def _framework_name(
 def _is_agent(
     name: str,
     qualified_name: str,
-    tags: Optional[List[str]],
-    metadata: Optional[Dict[str, Any]],
+    tags: list[str] | None,
+    metadata: dict[str, Any] | None,
 ) -> bool:
     identity = " ".join(
         [name, qualified_name, " ".join(tags or []), _safe_str(metadata or {})]
@@ -425,7 +425,7 @@ def _safe_str(value: Any) -> str:
         return str(value)[:_MAX_ATTR_TEXT_LEN]
 
 
-def _extract_model_name(serialized: Dict[str, Any], kwargs: Dict[str, Any]) -> Optional[str]:
+def _extract_model_name(serialized: dict[str, Any], kwargs: dict[str, Any]) -> str | None:
     invocation_params = kwargs.get("invocation_params") or {}
     return (
         invocation_params.get("model")
@@ -434,7 +434,7 @@ def _extract_model_name(serialized: Dict[str, Any], kwargs: Dict[str, Any]) -> O
     )
 
 
-def _extract_llm_output_text(response: Any) -> Optional[str]:
+def _extract_llm_output_text(response: Any) -> str | None:
     try:
         generations = response.generations
         texts = []
@@ -452,7 +452,7 @@ def _extract_llm_output_text(response: Any) -> Optional[str]:
         return None
 
 
-def _extract_llm_usage(response: Any) -> Tuple[Optional[int], Optional[int]]:
+def _extract_llm_usage(response: Any) -> tuple[int | None, int | None]:
     try:
         usage = (response.llm_output or {}).get("token_usage", {})
         return usage.get("prompt_tokens"), usage.get("completion_tokens")

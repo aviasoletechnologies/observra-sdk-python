@@ -9,9 +9,10 @@ route through the gateway and are traced.
 from __future__ import annotations
 
 import importlib
-import importlib.util
 import logging
 import threading
+
+from observra._optional import module_available
 
 logger = logging.getLogger("observra")
 
@@ -41,7 +42,7 @@ def _maybe_patch_http() -> None:
 
             httpx_patch.patch()
             _patched_providers.add("httpx")
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to auto-patch httpx for gateway routing", exc_info=True)
 
 
@@ -49,11 +50,11 @@ def _maybe_patch(probe_module: str, patch_module: str) -> None:
     with _lock:
         if probe_module in _patched_providers:
             return
-        if importlib.util.find_spec(probe_module) is None:
+        if not module_available(probe_module):
             return
         try:
             mod = importlib.import_module(patch_module)
             mod.patch()
             _patched_providers.add(probe_module)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to auto-patch provider %r", probe_module, exc_info=True)

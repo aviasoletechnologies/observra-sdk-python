@@ -13,7 +13,8 @@ import contextlib
 import logging
 import sys
 import threading
-from typing import Any, Dict, Iterator, Optional
+from collections.abc import Iterator
+from typing import Any
 
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.resources import Resource
@@ -51,7 +52,7 @@ class ObservraTracer:
     def _shutdown(self) -> None:
         try:
             self._provider.shutdown()
-        except Exception:  # noqa: BLE001 - shutdown must never raise into interpreter teardown
+        except Exception:
             logger.warning("observra: error shutting down tracer provider", exc_info=True)
 
     @contextlib.contextmanager
@@ -59,8 +60,8 @@ class ObservraTracer:
         self,
         name: str,
         kind: str,
-        attributes: Optional[Dict[str, Any]] = None,
-    ) -> Iterator[Optional[trace_api.Span]]:
+        attributes: dict[str, Any] | None = None,
+    ) -> Iterator[trace_api.Span | None]:
         """Open a span as the active context, isolated from the user's real call.
 
         Span setup/teardown failures are swallowed and logged (requirement
@@ -72,7 +73,7 @@ class ObservraTracer:
         attrs["observra.span_kind"] = kind
 
         span_cm = None
-        span: Optional[trace_api.Span] = None
+        span: trace_api.Span | None = None
         try:
             span_cm = self._tracer.start_as_current_span(
                 name,
@@ -82,7 +83,7 @@ class ObservraTracer:
                 set_status_on_exception=True,
             )
             span = span_cm.__enter__()
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to start span %r", name, exc_info=True)
 
         try:
@@ -91,14 +92,14 @@ class ObservraTracer:
             if span_cm is not None:
                 try:
                     span_cm.__exit__(*sys.exc_info())
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.warning("observra: failed to close span %r", name, exc_info=True)
             raise
         else:
             if span_cm is not None:
                 try:
                     span_cm.__exit__(None, None, None)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.warning("observra: failed to close span %r", name, exc_info=True)
 
 
@@ -106,8 +107,8 @@ class ObservraTracer:
         self,
         name: str,
         kind: str,
-        attributes: Optional[Dict[str, Any]] = None,
-    ) -> Optional[trace_api.Span]:
+        attributes: dict[str, Any] | None = None,
+    ) -> trace_api.Span | None:
         """Start a span whose end isn't tied to a ``with`` block.
 
         For callback-driven integrations (Step 6 framework instrumentation)
@@ -126,32 +127,32 @@ class ObservraTracer:
                 record_exception=True,
                 set_status_on_exception=True,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("observra: failed to start detached span %r", name, exc_info=True)
             return None
 
 
-def safe_set_attributes(span: Optional[trace_api.Span], attributes: Dict[str, Any]) -> None:
+def safe_set_attributes(span: trace_api.Span | None, attributes: dict[str, Any]) -> None:
     """Best-effort attribute set — never lets a bad attribute value break the call."""
     if span is None:
         return
     try:
         cleaned = {k: v for k, v in attributes.items() if v is not None}
         span.set_attributes(cleaned)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: failed to set span attributes", exc_info=True)
 
 
-def safe_add_event(span: Optional[trace_api.Span], name: str, attributes: Dict[str, Any]) -> None:
+def safe_add_event(span: trace_api.Span | None, name: str, attributes: dict[str, Any]) -> None:
     if span is None:
         return
     try:
         span.add_event(name, attributes=attributes)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: failed to add span event %r", name, exc_info=True)
 
 
-def safe_end_span(span: Optional[trace_api.Span], error: Optional[BaseException] = None) -> None:
+def safe_end_span(span: trace_api.Span | None, error: BaseException | None = None) -> None:
     if span is None:
         return
     try:
@@ -159,11 +160,11 @@ def safe_end_span(span: Optional[trace_api.Span], error: Optional[BaseException]
             span.record_exception(error)
             span.set_status(trace_api.Status(trace_api.StatusCode.ERROR, str(error)))
         span.end()
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("observra: failed to end span", exc_info=True)
 
 
-_tracers_by_config_id: Dict[int, ObservraTracer] = {}
+_tracers_by_config_id: dict[int, ObservraTracer] = {}
 _registry_lock = threading.Lock()
 
 
