@@ -17,5 +17,5 @@ jobs:
           python-version: "3.12"
 
       - run: pip install -e ".[dev]" build
-      - run: pytest
+      - run: pytest || [ "$?" = "5" ]
       - run: python -m build

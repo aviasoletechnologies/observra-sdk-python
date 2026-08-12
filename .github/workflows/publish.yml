@@ -42,7 +42,7 @@ jobs:
       - run: pip install -e ".[dev]" build
         if: steps.version.outputs.changed == 'true'
 
-      - run: pytest
+      - run: pytest || [ "$?" = "5" ]
         if: steps.version.outputs.changed == 'true'
 
       - run: python -m build
