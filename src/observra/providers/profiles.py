@@ -28,31 +28,53 @@ def _json_object(body_text: str) -> Mapping[str, Any]:
 
 
 def _truncate(value: str) -> str | None:
-    return value[:MAX_ATTR_TEXT_LEN] if value else None
+    if not value:
+        return None
+    if len(value) <= MAX_ATTR_TEXT_LEN:
+        return value
+    marker = "\n[truncated]"
+    return f"{value[: MAX_ATTR_TEXT_LEN - len(marker)]}{marker}"
+
+
+_BINARY_VALUE_KEYS = frozenset(
+    {
+        "inlineData",
+        "inline_data",
+        "image_url",
+        "signature",
+        "thoughtSignature",
+        "thought_signature",
+    }
+)
 
 
 def _content_text(value: Any) -> str | None:
-    """Extract human-readable text from common provider content shapes."""
-    if isinstance(value, str):
-        return _truncate(value)
-    if isinstance(value, list):
-        parts = [_content_text(item) for item in value]
-        return _truncate("\n".join(part for part in parts if part))
-    if isinstance(value, dict):
-        for key in (
-            "text",
-            "content",
-            "parts",
-            "message",
-            "messages",
-            "contents",
-            "prompt",
-            "response",
-        ):
-            text = _content_text(value.get(key))
-            if text:
-                return text
-    return None
+    """Collect all textual content from a model-visible provider payload section.
+
+    Tool arguments/results, system instructions, and provider-specific content blocks
+    can be nested differently across APIs. A first-match walk silently loses sibling
+    messages and function responses, so recurse through every non-binary value.
+    """
+    parts: list[str] = []
+
+    def collect(item: Any) -> None:
+        if isinstance(item, str):
+            parts.append(item)
+        elif isinstance(item, list):
+            for child in item:
+                collect(child)
+        elif isinstance(item, Mapping):
+            for key, child in item.items():
+                if key not in _BINARY_VALUE_KEYS:
+                    collect(child)
+
+    collect(value)
+    return _truncate("\n".join(parts))
+
+
+def _sections_text(data: Mapping[str, Any], *keys: str) -> str | None:
+    """Collect text from every model-visible top-level payload section in order."""
+    return _content_text([data[key] for key in keys if key in data])
 
 
 def _model(body_text: str) -> str | None:
@@ -61,26 +83,15 @@ def _model(body_text: str) -> str | None:
 
 
 def _openai_input(body_text: str) -> str | None:
-    return _content_text(_json_object(body_text).get("messages"))
+    data = _json_object(body_text)
+    return _sections_text(data, "instructions", "messages", "input", "prompt", "tools")
 
 
 def _openai_output(body_text: str) -> str | None:
     data = _json_object(body_text)
-    choices = data.get("choices")
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-        return _truncate(body_text)
-    message = choices[0].get("message") or choices[0].get("delta") or {}
-    text = _content_text(message.get("content") if isinstance(message, dict) else message)
-    if text:
-        return text
-    if isinstance(message, dict):
-        tool_calls = message.get("tool_calls")
-        if isinstance(tool_calls, list) and tool_calls and isinstance(tool_calls[0], dict):
-            function = tool_calls[0].get("function") or {}
-            name = function.get("name") if isinstance(function, dict) else None
-            if isinstance(name, str):
-                return f"[tool_call: {name}(...)]"
-    return _truncate(body_text)
+    return _sections_text(data, "choices", "output", "message", "response", "text") or _truncate(
+        body_text
+    )
 
 
 def _openai_usage(body_text: str) -> tuple[int | None, int | None]:
@@ -92,19 +103,12 @@ def _openai_usage(body_text: str) -> tuple[int | None, int | None]:
 
 def _anthropic_input(body_text: str) -> str | None:
     data = _json_object(body_text)
-    return _content_text(data.get("system")) or _content_text(data.get("messages"))
+    return _sections_text(data, "system", "messages", "tools")
 
 
 def _anthropic_output(body_text: str) -> str | None:
-    content = _json_object(body_text).get("content")
-    text = _content_text(content)
-    if text:
-        return text
-    if isinstance(content, list) and content and isinstance(content[0], dict):
-        name = content[0].get("name")
-        if isinstance(name, str):
-            return f"[tool_use: {name}(...)]"
-    return _truncate(body_text)
+    data = _json_object(body_text)
+    return _sections_text(data, "content") or _truncate(body_text)
 
 
 def _anthropic_usage(body_text: str) -> tuple[int | None, int | None]:
@@ -116,16 +120,12 @@ def _anthropic_usage(body_text: str) -> tuple[int | None, int | None]:
 
 def _ollama_input(body_text: str) -> str | None:
     data = _json_object(body_text)
-    return _content_text(data.get("messages")) or _content_text(data.get("prompt"))
+    return _sections_text(data, "system", "messages", "prompt", "tools")
 
 
 def _ollama_output(body_text: str) -> str | None:
     data = _json_object(body_text)
-    return (
-        _content_text(data.get("message"))
-        or _content_text(data.get("response"))
-        or _truncate(body_text)
-    )
+    return _sections_text(data, "message", "response") or _truncate(body_text)
 
 
 def _ollama_usage(body_text: str) -> tuple[int | None, int | None]:
@@ -134,25 +134,13 @@ def _ollama_usage(body_text: str) -> tuple[int | None, int | None]:
 
 
 def _gemini_input(body_text: str) -> str | None:
-    return _content_text(_json_object(body_text).get("contents"))
+    data = _json_object(body_text)
+    return _sections_text(data, "systemInstruction", "contents", "tools")
 
 
 def _gemini_output(body_text: str) -> str | None:
     data = _json_object(body_text)
-    candidates = data.get("candidates")
-    if not isinstance(candidates, list) or not candidates or not isinstance(candidates[0], dict):
-        return _truncate(body_text)
-    content = candidates[0].get("content")
-    parts = content.get("parts") if isinstance(content, dict) else None
-    text = _content_text(parts)
-    if text:
-        return text
-    if isinstance(parts, list):
-        for part in parts:
-            function_call = part.get("functionCall") if isinstance(part, dict) else None
-            if isinstance(function_call, dict) and isinstance(function_call.get("name"), str):
-                return f"[function_call: {function_call['name']}(...)]"
-    return _truncate(body_text)
+    return _sections_text(data, "candidates") or _truncate(body_text)
 
 
 def _gemini_usage(body_text: str) -> tuple[int | None, int | None]:

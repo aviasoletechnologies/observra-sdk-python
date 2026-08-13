@@ -1,19 +1,23 @@
 """OpenAI Chat Completions API through raw HTTP.
 
-Set OBSERVRA_GATEWAY_KEY and OPENAI_API_KEY before running.
+Set GATEWAY_KEY and OPENAI_API_KEY before running.
 """
 
 import os
+from pathlib import Path
 
 import httpx
 import observra
+from dotenv import load_dotenv
 
-observra.configure(gateway_key="")
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()
 
 response = httpx.post(
     "https://api.openai.com/v1/chat/completions",
-    headers={"Authorization": f"Bearer {""}"},
+    headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
     json={
         "model": "gpt-4o-mini",
         "messages": [{"role": "user", "content": "Explain observability in one sentence."}],

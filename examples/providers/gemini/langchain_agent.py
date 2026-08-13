@@ -11,17 +11,23 @@ Requires langchain>=1.0 (langgraph-based agents — `AgentExecutor` /
 of `langgraph.prebuilt.create_react_agent`).
 """
 
+import os
+from pathlib import Path
+
 import observra
+from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_agent
 
-observra.configure(gateway_key="")  
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument() 
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-3.1-flash-lite",
-    google_api_key="",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
 )
 
 
@@ -35,4 +41,3 @@ agent = create_agent(llm, tools=[search_docs])
 
 result = agent.invoke({"messages": [{"role": "user", "content": "What's our refund policy?"}]})
 print(result["messages"][-1].content)
-

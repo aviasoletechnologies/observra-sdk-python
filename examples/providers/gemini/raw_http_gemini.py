@@ -8,17 +8,20 @@ Compare with basic_gemini.py (google-genai Client, also auto-patched) and
 langchain_agent.py (framework-level, also auto-patched).
 """
 
+import os
+from pathlib import Path
+
 import httpx
-
 import observra
+from dotenv import load_dotenv
 
-observra.configure(
-    gateway_key=""
-)
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()
 
 MODEL = "gemini-3.1-flash-lite"
-GEMINI_API_KEY = ""  # your own Gemini key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 payload = {

@@ -17,6 +17,15 @@ logger = logging.getLogger("observra")
 
 _ENV_GATEWAY_URL = "OBSERVRA_GATEWAY_URL"
 _ENV_GATEWAY_KEY = "OBSERVRA_GATEWAY_KEY"
+_ENV_PROMPT_INJECTION_DETECTION = "OBSERVRA_PROMPT_INJECTION_DETECTION"
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """Read a conventional boolean environment variable without raising."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 # Production gateway — users never need to pass gateway_url themselves.
 # Override via configure(gateway_url=...) or OBSERVRA_GATEWAY_URL for local
@@ -40,6 +49,7 @@ class ObservraConfig(BaseModel):
     gateway_url: str = DEFAULT_GATEWAY_URL
     gateway_key: str
     insecure: bool = False
+    prompt_injection_detection: bool = False
 
     @model_validator(mode="after")
     def _validate(self) -> ObservraConfig:
@@ -74,6 +84,7 @@ def configure(
     gateway_url: str | None = None,
     gateway_key: str | None = None,
     insecure: bool = False,
+    prompt_injection_detection: bool | None = None,
 ) -> ObservraConfig:
     """Build and install the module-level config singleton.
 
@@ -93,6 +104,11 @@ def configure(
         gateway_url=gateway_url or os.environ.get(_ENV_GATEWAY_URL) or DEFAULT_GATEWAY_URL,
         gateway_key=gateway_key or os.environ.get(_ENV_GATEWAY_KEY, ""),
         insecure=insecure,
+        prompt_injection_detection=(
+            _env_bool(_ENV_PROMPT_INJECTION_DETECTION)
+            if prompt_injection_detection is None
+            else prompt_injection_detection
+        ),
     )
 
     with _lock:

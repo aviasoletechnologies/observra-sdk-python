@@ -12,7 +12,7 @@ from semantic_kernel.connectors.ai.open_ai.services.open_ai_chat_completion impo
     OpenAIChatCompletion,
 )
 
-load_dotenv(Path(__file__).with_name(".env"))
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()

@@ -1,19 +1,23 @@
 """Groq OpenAI-compatible API through raw HTTP.
 
-Set OBSERVRA_GATEWAY_KEY and GROQ_API_KEY before running.
+Set GATEWAY_KEY and GROQ_API_KEY before running.
 """
 
 import os
+from pathlib import Path
 
 import httpx
 import observra
+from dotenv import load_dotenv
 
-observra.configure(gateway_key="")
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()
 
 response = httpx.post(
     "https://api.groq.com/openai/v1/chat/completions",
-    headers={"Authorization": f"Bearer {""}"},
+    headers={"Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}"},
     json={
         "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": "Explain observability in one sentence."}],
