@@ -1,20 +1,24 @@
 """OpenRouter OpenAI-compatible API through raw HTTP.
 
-Set OBSERVRA_GATEWAY_KEY and OPENROUTER_API_KEY before running.
+Set GATEWAY_KEY and OPENROUTER_API_KEY before running.
 """
 
 import os
+from pathlib import Path
 
 import httpx
 import observra
+from dotenv import load_dotenv
 
-observra.configure(gateway_key="")
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()
 
 response = httpx.post(
     "https://api.openrouter.ai/api/v1/chat/completions",
     headers={
-        "Authorization": f"Bearer {""}",
+        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
     },
     json={
         "model": "openai/gpt-4o-mini",

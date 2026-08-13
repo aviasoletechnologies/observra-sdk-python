@@ -22,7 +22,8 @@ def _span_to_dict(span: ReadableSpan) -> dict[str, Any]:
     trace_id = ctx.trace_id if ctx is not None else 0
     span_id = ctx.span_id if ctx is not None else 0
     parent = span.parent
-    return {
+    attributes = dict(span.attributes or {})
+    trace = {
         "trace_id": format(trace_id, "032x"),
         "span_id": format(span_id, "016x"),
         "parent_span_id": format(parent.span_id, "016x") if parent is not None else None,
@@ -30,7 +31,7 @@ def _span_to_dict(span: ReadableSpan) -> dict[str, Any]:
         "kind": (span.attributes or {}).get("observra.span_kind", span.kind.name),
         "start_time": span.start_time,
         "end_time": span.end_time,
-        "attributes": dict(span.attributes or {}),
+        "attributes": attributes,
         "status": span.status.status_code.name,
         "events": [
             {
@@ -41,6 +42,7 @@ def _span_to_dict(span: ReadableSpan) -> dict[str, Any]:
             for event in (span.events or [])
         ],
     }
+    return trace
 
 
 class GatewayExporter(SpanExporter):

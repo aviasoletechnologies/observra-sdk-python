@@ -7,7 +7,7 @@ import observra
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-load_dotenv(Path(__file__).with_name(".env"))
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()

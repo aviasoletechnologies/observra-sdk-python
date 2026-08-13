@@ -1,20 +1,24 @@
 """Ollama Cloud chat API through raw HTTP.
 
-Set OBSERVRA_GATEWAY_KEY and OLLAMA_API_KEY before running.
+Set GATEWAY_KEY and OLLAMA_API_KEY before running.
 For local Ollama, use http://localhost:11434/api/chat instead.
 """
 
 import os
+from pathlib import Path
 
 import httpx
 import observra
+from dotenv import load_dotenv
 
-observra.configure(gateway_key="")
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()
 
 response = httpx.post(
     "https://ollama.com/api/chat",
-    headers={"Authorization": f"Bearer {""}"},
+    headers={"Authorization": f"Bearer {os.getenv('OLLAMA_API_KEY')}"},
     json={
         "model": "gpt-oss:120b-cloud",
         "messages": [{"role": "user", "content": "Explain observability in one sentence."}],

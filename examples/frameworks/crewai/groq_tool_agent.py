@@ -12,7 +12,7 @@ from crewai.hooks import before_llm_call
 from crewai.tools import tool
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).with_name(".env"))
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()

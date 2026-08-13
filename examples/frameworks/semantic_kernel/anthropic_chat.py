@@ -11,7 +11,7 @@ from semantic_kernel.connectors.ai.anthropic.services.anthropic_chat_completion 
     AnthropicChatCompletion,
 )
 
-load_dotenv(Path(__file__).with_name(".env"))
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()

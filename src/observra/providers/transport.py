@@ -122,6 +122,9 @@ class _ObservraTransportCore:
         # the gateway. Let httpx derive Host from the rewritten gateway URL.
         headers.pop("host", None)
         headers["x-gateway-key"] = self._config.gateway_key
+        headers["x-observra-prompt-injection-detection"] = str(
+            self._config.prompt_injection_detection
+        ).lower()
         if "x-provider-key" not in headers:
             scheme, _, provider_key = headers.get("authorization", "").partition(" ")
             if scheme.lower() == "bearer" and provider_key.strip():

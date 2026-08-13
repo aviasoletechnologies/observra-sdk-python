@@ -14,7 +14,7 @@ from llama_index.core.agent.workflow import AgentWorkflow, FunctionAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.groq import Groq
 
-load_dotenv(Path(__file__).with_name(".env"))
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()

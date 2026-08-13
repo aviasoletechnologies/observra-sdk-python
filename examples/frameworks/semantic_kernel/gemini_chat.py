@@ -11,7 +11,7 @@ from semantic_kernel.connectors.ai.google.google_ai.services.google_ai_chat_comp
     GoogleAIChatCompletion,
 )
 
-load_dotenv(Path(__file__).with_name(".env"))
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 observra.configure(gateway_key=os.getenv("GATEWAY_KEY"))
 observra.instrument()
