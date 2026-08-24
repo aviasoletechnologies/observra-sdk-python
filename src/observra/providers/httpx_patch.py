@@ -36,6 +36,7 @@ _PROVIDER_HOSTS = {
     "all://api.openai.com": "openai",
     "all://api.anthropic.com": "anthropic",
     "all://api.groq.com": "groq",
+    "all://api.cerebras.ai": "cerebras",
     "all://api.together.xyz": "together",
     "all://api.fireworks.ai": "fireworks",
     "all://api.deepseek.com": "deepseek",
