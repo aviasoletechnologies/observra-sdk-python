@@ -210,6 +210,15 @@ GROQ_PROFILE = ProviderTraceProfile(
     _openai_output,
     _openai_usage,
 )
+CEREBRAS_PROFILE = ProviderTraceProfile(
+    "cerebras",
+    "cerebras",
+    "cerebras.generate",
+    _model,
+    _openai_input,
+    _openai_output,
+    _openai_usage,
+)
 TOGETHER_PROFILE = ProviderTraceProfile(
     "together", "together", "together.generate", _model, _openai_input, _openai_output, _openai_usage
 )
@@ -261,6 +270,7 @@ PROVIDER_TRACE_PROFILES = {
     "openai": OPENAI_PROFILE,
     "anthropic": ANTHROPIC_PROFILE,
     "groq": GROQ_PROFILE,
+    "cerebras": CEREBRAS_PROFILE,
     "together": TOGETHER_PROFILE,
     "fireworks": FIREWORKS_PROFILE,
     "deepseek": DEEPSEEK_PROFILE,

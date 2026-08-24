@@ -55,6 +55,25 @@ client = Anthropic(api_key="sk-ant-...")  # your own Anthropic key
 response = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=1024, messages=[{"role": "user", "content": "..."}])
 ```
 
+Cerebras works through its native SDK, raw HTTPX, or any HTTPX-based OpenAI-compatible
+client. Configure Observra before constructing the client:
+
+```python
+import observra
+from cerebras.cloud.sdk import Cerebras
+
+observra.configure(gateway_key="obs_live_xxx")
+client = Cerebras(api_key="csk-...")
+response = client.chat.completions.create(
+    model="gpt-oss-120b",
+    messages=[{"role": "user", "content": "..."}],
+)
+```
+
+The OpenAI SDK works too with `base_url="https://api.cerebras.ai/v1"`. Sync and async
+HTTPX clients route to `/cerebras` automatically. Cerebras' optional aiohttp backend
+is not intercepted; use its default HTTPX backend.
+
 Same for async clients, and for any framework integration that builds one of these internally — e.g. LangChain's `ChatGoogleGenerativeAI` routes through the gateway automatically too, no extra step. See `examples/raw_http_gemini.py` for the same guarantee at the raw-HTTP level — no provider SDK at all, just `httpx` pointed straight at Google's real endpoint.
 
 Inside a LangChain agent — `instrument()` additionally traces every step (agent/chain/tool boundaries) under one trace, on top of the LLM-call-level tracing `configure()` already gives you:
@@ -66,4 +85,3 @@ observra.instrument()
 Guardrails (PII/secret detection on prompts and responses) run on every call automatically — violations are recorded as span events (`guardrail.violation`), the payload itself is never blocked or altered.
 
 See [`examples/`](examples/) for full runnable scripts, and traces show up in your Observra dashboard's Request Flow view.
-

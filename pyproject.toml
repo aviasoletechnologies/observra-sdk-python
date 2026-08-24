@@ -30,6 +30,7 @@ dependencies = [
 gemini = ["google-genai==2.16.0"]
 openai = ["openai==1.109.1"]
 anthropic = ["anthropic==0.120.2"]
+cerebras = ["cerebras-cloud-sdk==1.91.0"]
 examples = ["python-dotenv==1.2.2"]
 langchain = ["langchain>=0.2,<2.0", "langchain-core>=0.2,<2.0"]
 langgraph = ["langgraph>=1.2.10,<2.0"]
@@ -46,6 +47,7 @@ dev = [
     "langchain-google-genai",
     "openai",
     "anthropic",
+    "cerebras-cloud-sdk==1.91.0",
     "together==2.24.0",
     "mistralai==2.5.2",
     "cohere==7.0.0",
