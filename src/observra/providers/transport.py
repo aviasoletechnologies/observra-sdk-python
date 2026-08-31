@@ -77,6 +77,7 @@ class _ObservraTransportCore:
         span_kind: str = SpanKind.LLM,
         provider_name: str = "unknown",
         gateway_route: str | None = None,
+        strip_path_prefix: str = "",
         extract_model_name: ExtractModelName | None = None,
         extract_input_text: ExtractText | None = None,
         extract_output_text: ExtractText | None = None,
@@ -89,6 +90,7 @@ class _ObservraTransportCore:
         self._span_kind = span_kind
         self._provider_name = provider_name
         self._gateway_route = gateway_route or provider_name
+        self._strip_path_prefix = strip_path_prefix
         self._extract_model_name = extract_model_name or _default_extract_model_name
         self._extract_input_text = extract_input_text or _default_extract_text
         self._extract_output_text = extract_output_text or _default_extract_text
@@ -103,7 +105,7 @@ class _ObservraTransportCore:
         return self._tracer.start_span(self._span_name, self._span_kind)
 
     def _rewrite_to_gateway(self, request: httpx.Request) -> httpx.Request:
-        """Send the exact same payload to ``{gateway_url}/{gateway_route}{original_path}``.
+        """Send the same payload to ``{gateway_url}/{gateway_route}{provider_path}``.
 
         The gateway is a reverse proxy: it needs the provider name as a path
         segment to know which upstream to call (``http://localhost:8787/gemini``),
@@ -111,10 +113,18 @@ class _ObservraTransportCore:
         (``/v1beta/models/gemini-2.0-flash:generateContent``) and the original
         query string — only the scheme/host/port are replaced with the
         gateway's, and the provider segment is inserted at the front of the
-        path. The request body is forwarded unchanged.
+        path. A provider profile may remove its upstream-only path prefix before
+        routing. The request body is forwarded unchanged.
         """
         base = self._config.gateway_url.rstrip("/")
         original_path = request.url.raw_path.decode("ascii")
+        path, separator, query = original_path.partition("?")
+        if self._strip_path_prefix and (
+            path == self._strip_path_prefix
+            or path.startswith(f"{self._strip_path_prefix}/")
+        ):
+            path = path[len(self._strip_path_prefix) :]
+            original_path = f"{path}{separator}{query}"
         # ``raw_path`` includes both path and query, e.g. ``/v1beta/models/x?y=1``.
         new_url = httpx.URL(f"{base}/{self._gateway_route}{original_path}")
         headers = httpx.Headers(request.headers)
