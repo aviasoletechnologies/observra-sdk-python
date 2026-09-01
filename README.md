@@ -74,6 +74,12 @@ The OpenAI SDK works too with `base_url="https://api.cerebras.ai/v1"`. Sync and 
 HTTPX clients route to `/cerebras` automatically. Cerebras' optional aiohttp backend
 is not intercepted; use its default HTTPX backend.
 
+TokenRouter works with the OpenAI SDK by setting
+`base_url="https://api.tokenrouter.com/v1"`. Requests are automatically routed through
+the Observra gateway at `/tokenrouter`; the upstream `/v1` prefix is removed because the
+gateway handles TokenRouter's provider versioning.
+Raw HTTPX requests to the same TokenRouter host are handled identically.
+
 Same for async clients, and for any framework integration that builds one of these internally — e.g. LangChain's `ChatGoogleGenerativeAI` routes through the gateway automatically too, no extra step. See `examples/raw_http_gemini.py` for the same guarantee at the raw-HTTP level — no provider SDK at all, just `httpx` pointed straight at Google's real endpoint.
 
 Inside a LangChain agent — `instrument()` additionally traces every step (agent/chain/tool boundaries) under one trace, on top of the LLM-call-level tracing `configure()` already gives you:

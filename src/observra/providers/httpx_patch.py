@@ -46,6 +46,7 @@ _PROVIDER_HOSTS = {
     "all://router.huggingface.co": "huggingface",
     "all://api.openrouter.ai": "openrouter",
     "all://openrouter.ai": "openrouter",
+    "all://api.tokenrouter.com": "tokenrouter",
     "all://api.ollama.com": "ollama",
     "all://ollama.com": "ollama",
     "all://localhost:11434": "ollama",

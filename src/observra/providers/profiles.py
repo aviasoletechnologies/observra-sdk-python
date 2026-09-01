@@ -161,6 +161,7 @@ class ProviderTraceProfile:
     extract_input_text: ExtractText
     extract_output_text: ExtractText
     extract_usage: ExtractUsage
+    strip_path_prefix: str = ""
 
     def transport_kwargs(self) -> dict[str, Any]:
         return {
@@ -171,6 +172,7 @@ class ProviderTraceProfile:
             "extract_input_text": self.extract_input_text,
             "extract_output_text": self.extract_output_text,
             "extract_usage": self.extract_usage,
+            "strip_path_prefix": self.strip_path_prefix,
         }
 
 
@@ -255,6 +257,16 @@ OPENROUTER_PROFILE = ProviderTraceProfile(
     _openai_output,
     _openai_usage,
 )
+TOKENROUTER_PROFILE = ProviderTraceProfile(
+    "tokenrouter",
+    "tokenrouter",
+    "tokenrouter.generate",
+    _model,
+    _openai_input,
+    _openai_output,
+    _openai_usage,
+    "/v1",
+)
 OLLAMA_PROFILE = ProviderTraceProfile(
     "ollama",
     "ollama",
@@ -279,6 +291,7 @@ PROVIDER_TRACE_PROFILES = {
     "cohere": COHERE_PROFILE,
     "huggingface": HUGGINGFACE_PROFILE,
     "openrouter": OPENROUTER_PROFILE,
+    "tokenrouter": TOKENROUTER_PROFILE,
     "ollama": OLLAMA_PROFILE,
 }
 
